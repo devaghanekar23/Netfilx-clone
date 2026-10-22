@@ -1,0 +1,120 @@
+
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'devaghanekar/netflix-clone'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+
+        DOCKER_CRED_ID = 'docker-hub-credentials-2'
+        K8S_NAMESPACE = 'movie-app'
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+                sh 'ls -la'
+            }
+        }
+
+        stage('Validate Files') {
+            steps {
+                sh '''
+                    set -e
+                    test -f Dockerfile
+                    test -f nginx.conf
+                    test -f k8s/deployment.yaml
+                    test -f k8s/service.yaml
+                    test -f k8s/hpa.yaml
+                    test -f k8s/ingress.yaml
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build \
+                      -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
+                      -t ${DOCKER_IMAGE}:latest .
+                '''
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: "${DOCKER_CRED_ID}",
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        printf '%s' "$DOCKER_PASS" |
+                          docker login -u "$DOCKER_USER" --password-stdin
+
+                        docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                        docker push ${DOCKER_IMAGE}:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                    set -e
+
+                    kubectl config current-context
+                    kubectl get nodes
+
+                    kubectl create namespace ${K8S_NAMESPACE} \
+                      --dry-run=client -o yaml |
+                      kubectl apply -f -
+
+                    sed -i \
+                      "s|image: netflix:v3|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|" \
+                      k8s/deployment.yaml
+
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                    kubectl apply -f k8s/hpa.yaml
+                    kubectl apply -f k8s/ingress.yaml
+
+                    kubectl rollout status deployment/movie-app \
+                      -n ${K8S_NAMESPACE} --timeout=300s
+
+                    kubectl get pods -n ${K8S_NAMESPACE}
+                    kubectl get svc -n ${K8S_NAMESPACE}
+                    kubectl get hpa -n ${K8S_NAMESPACE}
+                    kubectl get ingress -n ${K8S_NAMESPACE}
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh '''
+                docker logout || true
+                docker rmi ${DOCKER_IMAGE}:${IMAGE_TAG} || true
+                docker rmi ${DOCKER_IMAGE}:latest || true
+            '''
+            echo 'Pipeline execution finished.'
+        }
+
+        success {
+            echo 'Netflix clone deployed successfully!'
+        }
+
+        failure {
+            echo 'Pipeline failed. Review the Console Output.'
+        }
+    }
+}
+
