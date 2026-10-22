@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: movie-app
-          image: netflix:v3 
+          image: netflix:v1 
           imagePullPolicy: IfNotPresent
 
           ports:

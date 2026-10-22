@@ -4,7 +4,7 @@ metadata:
   name: movie-app-service
   namespace: movie-app
 spec:
-  type: LoadBalancer
+  type: ClusterIP
 
   selector:
     app: movie-app
