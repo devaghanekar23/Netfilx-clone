@@ -24,10 +24,11 @@ pipeline {
                     set -e
                     test -f Dockerfile
                     test -f nginx.conf
-                    test -f k8s/deployment.yaml
-                    test -f k8s/service.yaml
-                    test -f k8s/hpa.yaml
-                    test -f k8s/ingress.yaml
+                    test -f k8s/deployment.yml
+                    test -f k8s/service.yml
+                    test -f k8s/hpa.yml
+                    test -f k8s/ingress.yml
+                    echo "All required files are present"
                 '''
             }
         }
@@ -82,10 +83,10 @@ pipeline {
                       "s|image: netflix:v3|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|" \
                       k8s/deployment.yaml
 
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                    kubectl apply -f k8s/hpa.yaml
-                    kubectl apply -f k8s/ingress.yaml
+                    kubectl apply -f k8s/deployment.yml
+                    kubectl apply -f k8s/service.yml
+                    kubectl apply -f k8s/hpa.yml
+                    kubectl apply -f k8s/ingress.yml
 
                     kubectl rollout status deployment/movie-app \
                       -n ${K8S_NAMESPACE} --timeout=300s
