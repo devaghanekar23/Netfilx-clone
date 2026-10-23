@@ -132,24 +132,6 @@ pipeline {
                 '''
             }
         }
-
-        stage('Port Forward Application') {
-            steps {
-                sh '''
-                    pkill -f 'kubectl port-forward.*movie-app-service' || true
-
-                    nohup kubectl port-forward \
-                      --address 0.0.0.0 \
-                      svc/movie-app-service \
-                      30080:80 \
-                      -n ${K8S_NAMESPACE} \
-                      > /tmp/port-forward.log 2>&1 < /dev/null &
-        
-                    sleep 3
-                    cat /tmp/port-forward.log
-                '''
-            }
-        }
     }
 
     post {
